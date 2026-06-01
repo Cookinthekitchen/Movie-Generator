@@ -1,0 +1,279 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>what do we watch</title>
+  <link href="style.css" rel="stylesheet" type="text/css">
+  <style>
+    @keyframes flicker {
+      0%   { opacity: 0; transform: translateY(-6px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    .tick { animation: flicker 0.08s ease-out forwards; display: inline-block; }
+  </style>
+</head>
+<body>
+
+  <div id="top-section">
+
+    <div class="marquee-wrap">
+      <div class="marquee-text">WHAT DO WE WATCH TONIGHT?? WHAT DO WE WATCH TONIGHT?? WHAT DO WE WATCH TONIGHT??</div>
+    </div>
+
+    <div id="welcome">
+      <h1>what do we watch</h1>
+      <p>stop scrolling. spin the wheel.</p>
+    </div>
+
+    <div id="nav">
+      <a href="index.html">
+        <button class="nav-tab">← back home</button>
+      </a>
+    </div>
+
+    <br>
+
+    <table border="3" cellpadding="15" cellspacing="5" bgcolor="#ffffff" width="100%">
+      <tr>
+        <td align="center">
+          <b><u>DECADE</u></b><br><br>
+          <font size="6" id="val-decade" color="#cc0000">???</font>
+        </td>
+        <td align="center">
+          <b><u>GENRE</u></b><br><br>
+          <font size="6" id="val-genre" color="#cc0000">???</font>
+        </td>
+        <td align="center">
+          <b><u>DIRECTOR LAST NAME STARTS WITH</u></b><br><br>
+          <font size="6" id="val-director" color="#cc0000">???</font>
+        </td>
+      </tr>
+    </table>
+
+    <br>
+    <center>
+      <input type="button" value=">>> RANDOMIZE <<<" id="roll-btn" onclick="roll()" style="font-size:18px; font-weight:bold; padding:8px 20px;">
+    </center>
+    <br>
+
+    <!-- match count -->
+    <div id="matches-box" style="display:none;">
+      <table border="2" cellpadding="12" bgcolor="#ffffcc" width="100%">
+        <tr>
+          <td align="center">
+            <b>📊 TMDB says:</b><br><br>
+            <font size="4" id="match-count" color="#000099">checking...</font><br><br>
+            <input type="button" value=">>> PICK A RANDOM ONE <<<" id="pick-btn" onclick="pickMovie()" style="font-size:16px; font-weight:bold; padding:6px 16px;" disabled>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- movie result -->
+    <div id="movie-box" style="display:none;">
+      <br>
+      <table border="2" cellpadding="12" bgcolor="#ccffcc" width="100%">
+        <tr>
+          <td>
+            <center><b>🎲 YOUR MOVIE:</b></center><br>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="80" valign="top">
+                  <img id="movie-poster" src="" width="75" style="display:none; border: 1px solid #999;">
+                </td>
+                <td valign="top" style="padding-left:10px;">
+                  <font size="5" color="#006600"><b><span id="movie-title">...</span></b></font><br>
+                  <font size="3" color="#333333"><span id="movie-meta"></span></font><br><br>
+                  <font size="2" color="#333333"><i><span id="movie-overview"></span></i></font><br><br>
+                  <font size="2" color="#000099"><span id="movie-director"></span></font><br><br>
+                  <a id="movie-tmdb-link" href="#" target="_blank"><b>🔗 view on tmdb</b></a>
+                  &nbsp;&nbsp;
+                  <input type="button" value="not feeling it, pick another" onclick="pickMovie()" style="font-size:13px; padding:4px 10px;">
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <br>
+    <hr>
+    <font size="1">powered by tmdb &nbsp;|&nbsp; <a href="index.html">back to homepage</a></font>
+    <br><br>
+
+  </div>
+
+  <script>
+    var API_KEY = 'aeea40a6926e1499e4a4e6b3530ba86c';
+    var BASE    = 'https://api.themoviedb.org/3';
+
+    function apiFetch(url) {
+      return fetch(url).then(function(r){ return r.json(); });
+    }
+
+    var decades = ['1930s','1940s','1950s','1960s','1970s','1980s','1990s','2000s','2010s','2020s'];
+
+    var genres = [
+      {label:'Action',         tmdb:28},
+      {label:'Adventure',      tmdb:12},
+      {label:'Animation',      tmdb:16},
+      {label:'Comedy',         tmdb:35},
+      {label:'Crime',          tmdb:80},
+      {label:'Documentary',    tmdb:99},
+      {label:'Drama',          tmdb:18},
+      {label:'Family',         tmdb:10751},
+      {label:'Fantasy',        tmdb:14},
+      {label:'History',        tmdb:36},
+      {label:'Horror',         tmdb:27},
+      {label:'Music',          tmdb:10402},
+      {label:'Mystery',        tmdb:9648},
+      {label:'Romance',        tmdb:10749},
+      {label:'Science Fiction',tmdb:878},
+      {label:'Thriller',       tmdb:53},
+      {label:'War',            tmdb:10752},
+      {label:'Western',        tmdb:37}
+    ];
+
+    var letters = 'ABCDEFGHIJKLMNOPRSTW'.split('');
+
+    var currentGenre  = null;
+    var currentDecade = null;
+    var currentLetter = null;
+    var totalPages    = 0;
+    var totalResults  = 0;
+
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    function decadeToYears(d) {
+      var start = parseInt(d.replace('s',''));
+      return { from: start + '-01-01', to: (start + 9) + '-12-31' };
+    }
+
+    function animateEl(id, pool, finalVal, duration, callback) {
+      var el = document.getElementById(id);
+      var ticks = 14;
+      var interval = duration / ticks;
+      var count = 0;
+      var timer = setInterval(function() {
+        var rand = pool[Math.floor(Math.random() * pool.length)];
+        el.className = 'tick';
+        el.innerHTML = typeof rand === 'object' ? rand.label : rand;
+        count++;
+        if (count >= ticks) {
+          clearInterval(timer);
+          el.innerHTML = typeof finalVal === 'object' ? finalVal.label : finalVal;
+          if (callback) callback();
+        }
+      }, interval);
+    }
+
+    function roll() {
+      document.getElementById('matches-box').style.display = 'none';
+      document.getElementById('movie-box').style.display   = 'none';
+      document.getElementById('roll-btn').disabled = true;
+
+      currentDecade = pick(decades);
+      currentGenre  = pick(genres);
+      currentLetter = pick(letters);
+
+      animateEl('val-decade',   decades, currentDecade, 700,  null);
+      animateEl('val-genre',    genres,  currentGenre,  950,  null);
+      animateEl('val-director', letters, currentLetter, 1200, function() {
+        document.getElementById('roll-btn').disabled = false;
+        fetchCount();
+      });
+    }
+
+    function fetchCount() {
+      var years = decadeToYears(currentDecade);
+      var url = BASE + '/discover/movie?api_key=' + API_KEY
+        + '&with_genres=' + currentGenre.tmdb
+        + '&primary_release_date.gte=' + years.from
+        + '&primary_release_date.lte=' + years.to
+        + '&sort_by=popularity.desc&page=1';
+
+      document.getElementById('match-count').innerHTML = 'loading...';
+      document.getElementById('pick-btn').disabled = true;
+      document.getElementById('matches-box').style.display = 'block';
+      document.getElementById('movie-box').style.display   = 'none';
+
+      apiFetch(url)
+        .then(function(data) {
+          totalResults = data.total_results || 0;
+          totalPages   = Math.min(data.total_pages || 0, 500);
+          document.getElementById('match-count').innerHTML =
+            '<b>' + totalResults.toLocaleString() + ' movies</b> found for: '
+            + currentGenre.label + ' &bull; ' + currentDecade;
+          document.getElementById('pick-btn').disabled = (totalResults === 0);
+          if (totalResults === 0) {
+            document.getElementById('match-count').innerHTML += '<br><font color="#cc0000">no results! try rolling again.</font>';
+          }
+        })
+        .catch(function(e) {
+          document.getElementById('match-count').innerHTML = '<font color="#cc0000">error: ' + e.message + '</font>';
+        });
+    }
+
+    function pickMovie() {
+      document.getElementById('movie-box').style.display = 'none';
+
+      var randomPage = Math.floor(Math.random() * Math.min(totalPages, 100)) + 1;
+      var years = decadeToYears(currentDecade);
+      var url = BASE + '/discover/movie?api_key=' + API_KEY
+        + '&with_genres=' + currentGenre.tmdb
+        + '&primary_release_date.gte=' + years.from
+        + '&primary_release_date.lte=' + years.to
+        + '&sort_by=popularity.desc&page=' + randomPage;
+
+      apiFetch(url)
+        .then(function(data) {
+          var movies = data.results;
+          if (!movies || movies.length === 0) { alert('no movies found, try again!'); return; }
+          var m = movies[Math.floor(Math.random() * movies.length)];
+          var year     = m.release_date ? m.release_date.substring(0,4) : '????';
+          var rating   = m.vote_average ? m.vote_average.toFixed(1) + '/10' : 'no rating';
+          var overview = m.overview ? m.overview.substring(0,220) + (m.overview.length > 220 ? '...' : '') : 'no description.';
+
+          document.getElementById('movie-title').innerHTML    = m.title;
+          document.getElementById('movie-meta').innerHTML     = '(' + year + ') &nbsp;&bull;&nbsp; &#11088; ' + rating;
+          document.getElementById('movie-overview').innerHTML = overview;
+          document.getElementById('movie-tmdb-link').href     = 'https://www.themoviedb.org/movie/' + m.id;
+          document.getElementById('movie-director').innerHTML = 'fetching director...';
+
+          var poster = document.getElementById('movie-poster');
+          if (m.poster_path) {
+            poster.src = 'https://image.tmdb.org/t/p/w92' + m.poster_path;
+            poster.style.display = 'block';
+          } else {
+            poster.style.display = 'none';
+          }
+
+          document.getElementById('movie-box').style.display = 'block';
+
+          // fetch director
+          apiFetch(BASE + '/movie/' + m.id + '/credits?api_key=' + API_KEY)
+            .then(function(credits) {
+              var directors = credits.crew.filter(function(p){ return p.job === 'Director'; });
+              if (directors.length > 0) {
+                var names    = directors.map(function(d){ return d.name; }).join(', ');
+                var lastName = directors[0].name.trim().split(' ').pop();
+                var initial  = lastName.charAt(0).toUpperCase();
+                var match    = initial === currentLetter;
+                document.getElementById('movie-director').innerHTML =
+                  '&#127916; directed by: <b>' + names + '</b> &nbsp;'
+                  + (match
+                    ? '<font color="#006600">&#10003; matches ' + currentLetter + '!!</font>'
+                    : '<font color="#cc0000">(starts with ' + initial + ', not ' + currentLetter + ')</font>');
+              } else {
+                document.getElementById('movie-director').innerHTML = 'director not found';
+              }
+            });
+        })
+        .catch(function(e) { alert('error: ' + e.message); });
+    }
+  </script>
+
+</body>
+</html>
